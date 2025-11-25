@@ -1,10 +1,10 @@
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
-#include <limits.h>
 
 int main(int argc, char *argv[]) {
   // Flush after every printf
@@ -38,7 +38,8 @@ int main(int argc, char *argv[]) {
     else if (strncmp(line, "type ", 5) == 0) {
       char *cmd = line + 5;
       // check for builtins
-      if (strcmp(cmd, "echo") == 0 || strcmp(cmd, "exit") == 0 || strcmp(cmd, "type") == 0 || strcmp(cmd, "pwd") == 0) {
+      if (strcmp(cmd, "echo") == 0 || strcmp(cmd, "exit") == 0 || strcmp(cmd, "type") == 0 ||
+          strcmp(cmd, "pwd") == 0 || strncmp(cmd, "cd", 2) == 0) {
         printf("%s is a shell builtin\n", cmd);
         continue;
       }
@@ -83,6 +84,50 @@ int main(int argc, char *argv[]) {
       continue;
 
     }
+
+    // absolute path handling for cd
+    else if (strncmp(line, "cd", 2) == 0) {
+      if (strcmp(line, "cd") == 0) {
+        continue;
+      }
+      if (line[2] != ' ') {
+        continue;
+      }
+      char *path = line + 3;
+      if (path[0] == '/') {
+        if (chdir(path) != 0) {
+          printf("cd: %s: No such file or directory\n", path);
+        }
+        continue;
+      }
+
+      if (path[0] == '~') {
+        char *home = getenv("HOME");
+        if (home == NULL) {
+          printf("cd: Home is not set\n");
+          continue;
+        }
+        if (path[1] == "\0") {
+          if (chdir(home) != 0) {
+            printf("cd: %s: No such file or directory\n", home);
+          }
+          continue;
+        }
+        char fullpath[PATH_MAX];
+        snprintf(fullpath, sizeof(fullpath), "%s/%s", home, path + 2);
+        if (chdir(fullpath) != 0) {
+          printf("cd: %s: No such file or directory\n", fullpath);
+        }
+        continue;
+      }
+
+      // relative path handling for cd
+      if (chdir(path) != 0) {
+        printf("cd: %s: No such file or directory\n", path);
+      }
+      continue;
+    }
+
     // EXTERNAL COMMANDS FOR RUNNIGN A PROGRAM
     {
       char *args[20];
@@ -113,7 +158,7 @@ int main(int argc, char *argv[]) {
       int found = 0;
 
       char exec_path[1200];
- 
+
       while (dir != NULL) {
         snprintf(exec_path, sizeof(exec_path), "%s/%s", dir, cmd);
 
@@ -125,7 +170,7 @@ int main(int argc, char *argv[]) {
       }
 
       if (!found) {
-        printf("%s: command not found\n", cmd); 
+        printf("%s: command not found\n", cmd);
         continue;
       }
 
