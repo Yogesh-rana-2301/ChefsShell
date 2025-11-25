@@ -4,6 +4,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <limits.h>
 
 int main(int argc, char *argv[]) {
   // Flush after every printf
@@ -37,7 +38,7 @@ int main(int argc, char *argv[]) {
     else if (strncmp(line, "type ", 5) == 0) {
       char *cmd = line + 5;
       // check for builtins
-      if (strcmp(cmd, "echo") == 0 || strcmp(cmd, "exit") == 0 || strcmp(cmd, "type") == 0) {
+      if (strcmp(cmd, "echo") == 0 || strcmp(cmd, "exit") == 0 || strcmp(cmd, "type") == 0 || strcmp(cmd, "pwd") == 0) {
         printf("%s is a shell builtin\n", cmd);
         continue;
       }
@@ -71,6 +72,17 @@ int main(int argc, char *argv[]) {
       }
     }
 
+    // PWD
+    else if (strncmp(line, "pwd", 3) == 0) {
+      char cwd[1000];
+      if (getcwd(cwd, sizeof(cwd)) != NULL) {
+        printf("%s\n", cwd);
+      } else {
+        perror("getcwd() error");
+      }
+      continue;
+
+    }
     // EXTERNAL COMMANDS FOR RUNNIGN A PROGRAM
     {
       char *args[20];
