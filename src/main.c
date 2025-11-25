@@ -2,9 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <unistd.h>
 #include <sys/wait.h>
-
+#include <unistd.h>
 
 int main(int argc, char *argv[]) {
   // Flush after every printf
@@ -69,8 +68,72 @@ int main(int argc, char *argv[]) {
           printf("%s: not found\n", cmd);
         }
         continue;
-      } 
-      
+      }
+    }
+
+    // EXTERNAL COMMANDS FOR RUNNIGN A PROGRAM
+    {
+      char *args[20];
+      char *token = strtok(line, " ");
+      int i = 0;
+
+      while (token != NULL && i < 19) {
+        args[i++] = token;
+        token = strtok(NULL, " ");
+      }
+      args[i] = NULL;
+
+      if (args[0] == NULL) {
+        continue;  // empty command
+      }
+
+      char *cmd = args[0];
+
+      // Search PATH for executable
+      char *path = getenv("PATH");
+      if (path == NULL) path = "";
+
+      char path_cpy[1000];
+      strncpy(path_cpy, path, sizeof(path_cpy));
+      path_cpy[sizeof(path_cpy) - 1] = '\0';
+
+      char *dir = strtok(path_cpy, ":");
+      int found = 0;
+
+      char exec_path[1200];
+ 
+      while (dir != NULL) {
+        snprintf(exec_path, sizeof(exec_path), "%s/%s", dir, cmd);
+
+        if (access(exec_path, X_OK) == 0) {
+          found = 1;
+          break;
+        }
+        dir = strtok(NULL, ":");
+      }
+
+      if (!found) {
+        printf("%s: command not found\n", cmd); 
+        continue;
+      }
+
+      // Run the executable
+      pid_t pid = fork();
+
+      if (pid < 0) {
+        perror("fork failed");
+      } else if (pid == 0) {
+        // Child process
+        execv(exec_path, args);
+        perror("execv failed");
+        exit(1);
+      } else {
+        // Parent
+        int status;
+        waitpid(pid, &status, 0);
+      }
+
+      continue;
     }
 
     printf("%s: command not found\n", line);
