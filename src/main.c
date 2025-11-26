@@ -7,10 +7,11 @@
 #include <unistd.h>
 
 // Making a self tokeniser of ' ' adn " "
-void tokenize(char *line, char *args[], int *argc_out) {
+void tokenize(char* line, char* args[], int* argc_out) {
   int i = 0;
   int len = strlen(line);
   int in_quotes = 0;
+  int in_double_quotes = 0;
   char current[200] = {0};
   int cur = 0;
 
@@ -26,9 +27,23 @@ void tokenize(char *line, char *args[], int *argc_out) {
       continue;
     }
 
+    if (in_double_quotes) {
+      if (c == '\"') {
+        in_double_quotes = 0;
+      } else {
+        current[cur++] = c;
+      }
+      continue;
+    }
+
     // not in quotes
     if (c == '\'') {
       in_quotes = 1;
+      continue;
+    }
+
+    if (c == '\"') {
+      in_double_quotes = !in_double_quotes;
       continue;
     }
 
@@ -56,7 +71,7 @@ void tokenize(char *line, char *args[], int *argc_out) {
   *argc_out = i;
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
   // Flush after every printf
   setbuf(stdout, NULL);
 
@@ -75,20 +90,19 @@ int main(int argc, char *argv[]) {
       exit(0);
     }
 
-    
     // ECHO
     else if (strncmp(line, "echo", 4) == 0) {
-    char *args2[20];
-    int argc_echo = 0;
-    tokenize(line + 5, args2, &argc_echo);
+      char* args2[20];
+      int argc_echo = 0;
+      tokenize(line + 5, args2, &argc_echo);
 
-    for (int k = 0; k < argc_echo; k++) {
+      for (int k = 0; k < argc_echo; k++) {
         printf("%s", args2[k]);
         if (k < argc_echo - 1) printf(" ");
+      }
+      printf("\n");
+      continue;
     }
-    printf("\n");
-    continue;
-}
 
     /*
     else if (strncmp(line, "echo ", 5) == 0) {
@@ -101,7 +115,7 @@ int main(int argc, char *argv[]) {
     */
     // TYPE
     else if (strncmp(line, "type ", 5) == 0) {
-      char *cmd = line + 5;
+      char* cmd = line + 5;
       // check for builtins
       if (strcmp(cmd, "echo") == 0 || strcmp(cmd, "exit") == 0 || strcmp(cmd, "type") == 0 ||
           strcmp(cmd, "pwd") == 0 || strncmp(cmd, "cd", 2) == 0) {
@@ -110,13 +124,13 @@ int main(int argc, char *argv[]) {
       }
       // check for executable in PATH
       else {
-        char *path = getenv("PATH");
+        char* path = getenv("PATH");
         if (path == NULL) path = "";
         char path_cpy[1000];
         strncpy(path_cpy, path, sizeof(path_cpy));
         path_cpy[sizeof(path_cpy) - 1] = '\0';  // Ensure null-termination
 
-        char *dir = strtok(path_cpy, ":");
+        char* dir = strtok(path_cpy, ":");
 
         int found = 0;
 
@@ -158,7 +172,7 @@ int main(int argc, char *argv[]) {
       if (line[2] != ' ') {
         continue;
       }
-      char *path = line + 3;
+      char* path = line + 3;
       if (path[0] == '/') {
         if (chdir(path) != 0) {
           printf("cd: %s: No such file or directory\n", path);
@@ -167,7 +181,7 @@ int main(int argc, char *argv[]) {
       }
       // home directory handling for cd
       if (path[0] == '~') {
-        char *home = getenv("HOME");
+        char* home = getenv("HOME");
         if (home == NULL) {
           printf("cd: Home is not set\n");
           continue;
@@ -195,11 +209,13 @@ int main(int argc, char *argv[]) {
 
     // EXTERNAL COMMANDS FOR RUNNIGN A PROGRAM
     {
-      char *args[20];
+      char* args[20];
       int argc2 = 0;
       tokenize(line, args, &argc2);
-      if (argc2 == 0) { continue; }
-      
+      if (argc2 == 0) {
+        continue;
+      }
+
       // Alternative tokenization
       /*
       char *token = strtok(line, " ");
@@ -216,17 +232,17 @@ int main(int argc, char *argv[]) {
       }
       */
 
-      char *cmd = args[0];
+      char* cmd = args[0];
 
       // Search PATH for executable
-      char *path = getenv("PATH");
+      char* path = getenv("PATH");
       if (path == NULL) path = "";
 
       char path_cpy[1000];
       strncpy(path_cpy, path, sizeof(path_cpy));
       path_cpy[sizeof(path_cpy) - 1] = '\0';
 
-      char *dir = strtok(path_cpy, ":");
+      char* dir = strtok(path_cpy, ":");
       int found = 0;
 
       char exec_path[1200];
