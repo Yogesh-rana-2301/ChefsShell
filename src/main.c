@@ -6,17 +6,25 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-// Making a self tokeniser of ' ' adn " "
+
+// Making a self tokeniser of ' ' adn " " and backslash escapes
 void tokenize(char* line, char* args[], int* argc_out) {
   int i = 0;
   int len = strlen(line);
   int in_quotes = 0;
   int in_double_quotes = 0;
+  int escape = 0;
   char current[200] = {0};
   int cur = 0;
 
   for (int j = 0; j < len; j++) {
     char c = line[j];
+
+    
+    if (!in_quotes && !in_double_quotes && c == '\\') {
+      escape = 1;
+      continue;
+    }
 
     if (in_quotes) {
       if (c == '\'') {
@@ -28,6 +36,22 @@ void tokenize(char* line, char* args[], int* argc_out) {
     }
 
     if (in_double_quotes) {
+      if (escape){
+        if (c=='\"' || c=='\\') {
+          current[cur++] = c;
+        } else {
+          current[cur++] = '\\';
+          current[cur++] = c;
+        }
+        escape = 0;
+        continue;
+      }
+
+      if (c== '\\') {
+        escape = 1;
+        continue;
+      }
+  
       if (c == '\"') {
         in_double_quotes = 0;
       } else {
@@ -36,6 +60,14 @@ void tokenize(char* line, char* args[], int* argc_out) {
       continue;
     }
 
+
+    if (escape){
+      current[cur++] = c;
+      escape = 0;
+      continue;
+    }
+
+
     // not in quotes
     if (c == '\'') {
       in_quotes = 1;
@@ -43,7 +75,7 @@ void tokenize(char* line, char* args[], int* argc_out) {
     }
 
     if (c == '\"') {
-      in_double_quotes = !in_double_quotes;
+      in_double_quotes = 1;
       continue;
     }
 
