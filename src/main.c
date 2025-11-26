@@ -6,6 +6,56 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+// Making a self tokeniser of ' ' adn " "
+void tokenize(char *line, char *args[], int *argc_out) {
+  int i = 0;
+  int len = strlen(line);
+  int in_quotes = 0;
+  char current[200] = {0};
+  int cur = 0;
+
+  for (int j = 0; j < len; j++) {
+    char c = line[j];
+
+    if (in_quotes) {
+      if (c == '\'') {
+        in_quotes = 0;
+      } else {
+        current[cur++] = c;
+      }
+      continue;
+    }
+
+    // not in quotes
+    if (c == '\'') {
+      in_quotes = 1;
+      continue;
+    }
+
+    if (c == ' ' || c == '\t') {
+      if (cur > 0) {
+        current[cur] = '\0';
+        args[i] = strdup(current);
+        i++;
+        cur = 0;
+        current[0] = '\0';
+      }
+      continue;
+    }
+
+    current[cur++] = c;
+  }
+
+  if (cur > 0) {
+    current[cur] = '\0';
+    args[i] = strdup(current);
+    i++;
+  }
+
+  args[i] = NULL;
+  *argc_out = i;
+}
+
 int main(int argc, char *argv[]) {
   // Flush after every printf
   setbuf(stdout, NULL);
@@ -25,7 +75,22 @@ int main(int argc, char *argv[]) {
       exit(0);
     }
 
+    
     // ECHO
+    else if (strncmp(line, "echo", 4) == 0) {
+    char *args2[20];
+    int argc_echo = 0;
+    tokenize(line + 5, args2, &argc_echo);
+
+    for (int k = 0; k < argc_echo; k++) {
+        printf("%s", args2[k]);
+        if (k < argc_echo - 1) printf(" ");
+    }
+    printf("\n");
+    continue;
+}
+
+    /*
     else if (strncmp(line, "echo ", 5) == 0) {
       printf("%s\n", line + 5);
       continue;
@@ -33,7 +98,7 @@ int main(int argc, char *argv[]) {
       printf("\n");
       continue;
     }
-
+    */
     // TYPE
     else if (strncmp(line, "type ", 5) == 0) {
       char *cmd = line + 5;
@@ -100,7 +165,7 @@ int main(int argc, char *argv[]) {
         }
         continue;
       }
-
+      // home directory handling for cd
       if (path[0] == '~') {
         char *home = getenv("HOME");
         if (home == NULL) {
@@ -131,6 +196,12 @@ int main(int argc, char *argv[]) {
     // EXTERNAL COMMANDS FOR RUNNIGN A PROGRAM
     {
       char *args[20];
+      int argc2 = 0;
+      tokenize(line, args, &argc2);
+      if (argc2 == 0) { continue; }
+      
+      // Alternative tokenization
+      /*
       char *token = strtok(line, " ");
       int i = 0;
 
@@ -143,6 +214,7 @@ int main(int argc, char *argv[]) {
       if (args[0] == NULL) {
         continue;  // empty command
       }
+      */
 
       char *cmd = args[0];
 
