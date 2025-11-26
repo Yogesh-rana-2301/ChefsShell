@@ -125,36 +125,57 @@ int main(int argc, char* argv[]) {
       int argc_echo = 0;
       tokenize(line + 5, args2, &argc_echo);
 
-      int redirect_index = -1;
+      int redirect_stdout_index = -1;
+      int redirect_stderr_index = -1;
       char* outfile = NULL;
+      char* errfile = NULL;
 
       for (int r = 0; r < argc_echo; r++) {
-          if (strcmp(args2[r], ">") == 0 || strcmp(args2[r], "1>") == 0) {
-              redirect_index = r;
-              outfile = args2[r + 1];
-              break;
-          }
+        if (strcmp(args2[r], ">") == 0 || strcmp(args2[r], "1>") == 0) {
+          redirect_stdout_index = r;
+          outfile = args2[r + 1];
+          break;
+        } else if (strcmp(args2[r], "2>") == 0) {
+          redirect_stderr_index = r;
+          errfile = args2[r + 1];
+          break;
+        }
       }
 
       // Prepare for temporary redirection
       int saved_stdout = -1;
       int fd = -1;
 
-      if (redirect_index != -1) {
-          fd = open(outfile, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-          if (fd < 0) {
-              perror("open");
-              continue;
-          }
+      if (redirect_stdout_index != -1) {
+        fd = open(outfile, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+        if (fd < 0) {
+          perror("open");
+          continue;
+        }
 
-          
-          saved_stdout = dup(1);
+        saved_stdout = dup(1);
 
-          dup2(fd, 1);
-          close(fd);
+        dup2(fd, 1);
+        close(fd);
 
-          args2[redirect_index] = NULL;
-          argc_echo = redirect_index;
+        args2[redirect_stdout_index] = NULL;
+        argc_echo = redirect_stdout_index;
+      }
+
+      if (redirect_stderr_index != -1) {
+        int fd_err = open(errfile, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+        if (fd_err < 0) {
+          perror("open");
+          continue;
+        }
+
+        saved_stdout = dup(1);
+ 
+        dup2(fd_err, 2);
+        close(fd_err);
+
+        args2[redirect_stderr_index] = NULL;
+        argc_echo = redirect_stderr_index;
       }
 
       for (int k = 0; k < argc_echo; k++) {
@@ -164,10 +185,10 @@ int main(int argc, char* argv[]) {
       printf("\n");
 
       if (saved_stdout != -1) {
-          dup2(saved_stdout, 1);
-          close(saved_stdout);
+        dup2(saved_stdout, 1);
+        close(saved_stdout);
       }
-      
+
       continue;
     }
 
@@ -299,18 +320,27 @@ int main(int argc, char* argv[]) {
       }
       */
 
-      // Redirect Stdout
-      int redirect_index = -1;
+      // Redirect Stdout and stderr if needed
+      int redirect_stdout_index = -1;
+      int redirect_stderr_index = -1;
       char* filename = NULL;
+      char* errfile = NULL;
       for (int k = 0; k < argc2; k++) {
         if (strncmp(args[k], ">", 1) == 0 || strncmp(args[k], "1>", 2) == 0) {
-          redirect_index = k;
+          redirect_stdout_index = k;
           filename = args[k + 1];
+          break;
+        } else if (strncmp(args[k], "2>", 2) == 0) {
+          redirect_stderr_index = k;
+          errfile = args[k + 1];
           break;
         }
       }
-      if (redirect_index != -1) {
-        args[redirect_index] = NULL;
+      if (redirect_stdout_index != -1) {
+        args[redirect_stdout_index] = NULL;
+      }
+      if (redirect_stderr_index != -1) {
+        args[redirect_stderr_index] = NULL;
       }
       // Find the command in PATH
       char* cmd = args[0];
@@ -343,10 +373,6 @@ int main(int argc, char* argv[]) {
         continue;
       }
 
-      if (redirect_index != -1) {
-        args[redirect_index] = NULL;
-      }
-
       // Run the executable
       pid_t pid = fork();
 
@@ -354,13 +380,22 @@ int main(int argc, char* argv[]) {
         perror("fork failed");
       } else if (pid == 0) {
         // Child process
-        if (redirect_index != -1) {
+        if (redirect_stdout_index != -1) {
           int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0666);
           if (fd < 0) {
             perror("open");
             exit(1);
           }
           dup2(fd, 1);
+          close(fd);
+        }
+        if (redirect_stderr_index != -1) {
+          int fd = open(errfile, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+          if (fd < 0) {
+            perror("open");
+            exit(1);
+          }
+          dup2(fd, 2);
           close(fd);
         }
         execv(exec_path, args);
