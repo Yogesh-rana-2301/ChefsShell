@@ -1,3 +1,4 @@
+#include <fcntl.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -5,7 +6,6 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
-
 
 // Making a self tokeniser of ' ' adn " " and backslash escapes
 void tokenize(char* line, char* args[], int* argc_out) {
@@ -20,7 +20,6 @@ void tokenize(char* line, char* args[], int* argc_out) {
   for (int j = 0; j < len; j++) {
     char c = line[j];
 
-    
     if (!in_quotes && !in_double_quotes && c == '\\') {
       escape = 1;
       continue;
@@ -36,8 +35,8 @@ void tokenize(char* line, char* args[], int* argc_out) {
     }
 
     if (in_double_quotes) {
-      if (escape){
-        if (c=='\"' || c=='\\') {
+      if (escape) {
+        if (c == '\"' || c == '\\') {
           current[cur++] = c;
         } else {
           current[cur++] = '\\';
@@ -47,11 +46,11 @@ void tokenize(char* line, char* args[], int* argc_out) {
         continue;
       }
 
-      if (c== '\\') {
+      if (c == '\\') {
         escape = 1;
         continue;
       }
-  
+
       if (c == '\"') {
         in_double_quotes = 0;
       } else {
@@ -60,13 +59,11 @@ void tokenize(char* line, char* args[], int* argc_out) {
       continue;
     }
 
-
-    if (escape){
+    if (escape) {
       current[cur++] = c;
       escape = 0;
       continue;
     }
-
 
     // not in quotes
     if (c == '\'') {
@@ -128,11 +125,49 @@ int main(int argc, char* argv[]) {
       int argc_echo = 0;
       tokenize(line + 5, args2, &argc_echo);
 
+      int redirect_index = -1;
+      char* outfile = NULL;
+
+      for (int r = 0; r < argc_echo; r++) {
+          if (strcmp(args2[r], ">") == 0 || strcmp(args2[r], "1>") == 0) {
+              redirect_index = r;
+              outfile = args2[r + 1];
+              break;
+          }
+      }
+
+      // Prepare for temporary redirection
+      int saved_stdout = -1;
+      int fd = -1;
+
+      if (redirect_index != -1) {
+          fd = open(outfile, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+          if (fd < 0) {
+              perror("open");
+              continue;
+          }
+
+          
+          saved_stdout = dup(1);
+
+          dup2(fd, 1);
+          close(fd);
+
+          args2[redirect_index] = NULL;
+          argc_echo = redirect_index;
+      }
+
       for (int k = 0; k < argc_echo; k++) {
         printf("%s", args2[k]);
         if (k < argc_echo - 1) printf(" ");
       }
       printf("\n");
+
+      if (saved_stdout != -1) {
+          dup2(saved_stdout, 1);
+          close(saved_stdout);
+      }
+      
       continue;
     }
 
@@ -264,6 +299,20 @@ int main(int argc, char* argv[]) {
       }
       */
 
+      // Redirect Stdout
+      int redirect_index = -1;
+      char* filename = NULL;
+      for (int k = 0; k < argc2; k++) {
+        if (strncmp(args[k], ">", 1) == 0 || strncmp(args[k], "1>", 2) == 0) {
+          redirect_index = k;
+          filename = args[k + 1];
+          break;
+        }
+      }
+      if (redirect_index != -1) {
+        args[redirect_index] = NULL;
+      }
+      // Find the command in PATH
       char* cmd = args[0];
 
       // Search PATH for executable
@@ -294,6 +343,10 @@ int main(int argc, char* argv[]) {
         continue;
       }
 
+      if (redirect_index != -1) {
+        args[redirect_index] = NULL;
+      }
+
       // Run the executable
       pid_t pid = fork();
 
@@ -301,6 +354,15 @@ int main(int argc, char* argv[]) {
         perror("fork failed");
       } else if (pid == 0) {
         // Child process
+        if (redirect_index != -1) {
+          int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+          if (fd < 0) {
+            perror("open");
+            exit(1);
+          }
+          dup2(fd, 1);
+          close(fd);
+        }
         execv(exec_path, args);
         perror("execv failed");
         exit(1);
