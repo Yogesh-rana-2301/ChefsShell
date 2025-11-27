@@ -411,7 +411,7 @@ int main(int argc, char* argv[]) {
       char* cmd = line + 5;
       // check for builtins
       if (strcmp(cmd, "echo") == 0 || strcmp(cmd, "exit") == 0 || strcmp(cmd, "type") == 0 ||
-          strcmp(cmd, "pwd") == 0 || strncmp(cmd, "cd", 2) == 0) {
+          strcmp(cmd, "pwd") == 0 || strncmp(cmd, "cd", 2) == 0 || strncmp(cmd, "history", 7) == 0) {
         printf("%s is a shell builtin\n", cmd);
         continue;
       }
@@ -506,6 +506,134 @@ int main(int argc, char* argv[]) {
       int argc2 = 0;
       tokenize(line, args, &argc2);
       if (argc2 == 0) {
+        continue;
+      }
+
+      // Check for pipeline
+      int pipe_index = -1;
+      for (int k = 0; k < argc2; k++) {
+        if (strcmp(args[k], "|") == 0) {
+          pipe_index = k;
+          break;
+        }
+      }
+
+      // Handle pipeline with two commands
+      if (pipe_index != -1) {
+        // Split commands
+        char* cmd1_args[20];
+        char* cmd2_args[20];
+        
+        for (int i = 0; i < pipe_index; i++) {
+          cmd1_args[i] = args[i];
+        }
+        cmd1_args[pipe_index] = NULL;
+        
+        int cmd2_argc = 0;
+        for (int i = pipe_index + 1; i < argc2; i++) {
+          cmd2_args[cmd2_argc++] = args[i];
+        }
+        cmd2_args[cmd2_argc] = NULL;
+
+        // Find executables in PATH
+        char* path = getenv("PATH");
+        if (path == NULL) path = "";
+
+        char path_cpy1[1000], path_cpy2[1000];
+        strncpy(path_cpy1, path, sizeof(path_cpy1));
+        strncpy(path_cpy2, path, sizeof(path_cpy2));
+        path_cpy1[sizeof(path_cpy1) - 1] = '\0';
+        path_cpy2[sizeof(path_cpy2) - 1] = '\0';
+
+        // Find first command
+        char exec_path1[1200] = {0};
+        int found1 = 0;
+        char* dir = strtok(path_cpy1, ":");
+        while (dir != NULL) {
+          snprintf(exec_path1, sizeof(exec_path1), "%s/%s", dir, cmd1_args[0]);
+          if (access(exec_path1, X_OK) == 0) {
+            found1 = 1;
+            break;
+          }
+          dir = strtok(NULL, ":");
+        }
+
+        // Find second command
+        char exec_path2[1200] = {0};
+        int found2 = 0;
+        dir = strtok(path_cpy2, ":");
+        while (dir != NULL) {
+          snprintf(exec_path2, sizeof(exec_path2), "%s/%s", dir, cmd2_args[0]);
+          if (access(exec_path2, X_OK) == 0) {
+            found2 = 1;
+            break;
+          }
+          dir = strtok(NULL, ":");
+        }
+
+        if (!found1) {
+          printf("%s: command not found\n", cmd1_args[0]);
+          continue;
+        }
+        if (!found2) {
+          printf("%s: command not found\n", cmd2_args[0]);
+          continue;
+        }
+
+        // Create pipe
+        int pipefd[2];
+        if (pipe(pipefd) == -1) {
+          perror("pipe");
+          continue;
+        }
+
+        // Fork first command
+        pid_t pid1 = fork();
+        if (pid1 < 0) {
+          perror("fork");
+          close(pipefd[0]);
+          close(pipefd[1]);
+          continue;
+        }
+
+        if (pid1 == 0) {
+          // First child: write to pipe
+          close(pipefd[0]);  // Close read end
+          dup2(pipefd[1], 1);  // Redirect stdout to pipe write end
+          close(pipefd[1]);
+          execv(exec_path1, cmd1_args);
+          perror("execv failed");
+          exit(1);
+        }
+
+        // Fork second command
+        pid_t pid2 = fork();
+        if (pid2 < 0) {
+          perror("fork");
+          close(pipefd[0]);
+          close(pipefd[1]);
+          waitpid(pid1, NULL, 0);
+          continue;
+        }
+
+        if (pid2 == 0) {
+          // Second child: read from pipe
+          close(pipefd[1]);  // Close write end
+          dup2(pipefd[0], 0);  // Redirect stdin to pipe read end
+          close(pipefd[0]);
+          execv(exec_path2, cmd2_args);
+          perror("execv failed");
+          exit(1);
+        }
+
+        // Parent: close both ends and wait for both children
+        close(pipefd[0]);
+        close(pipefd[1]);
+        
+        int status1, status2;
+        waitpid(pid1, &status1, 0);
+        waitpid(pid2, &status2, 0);
+
         continue;
       }
 
