@@ -7,6 +7,38 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <readline/readline.h>
+#include <readline/history.h>
+
+//builtin commands
+const char* builtins[] = {"echo", "exit", NULL};
+
+//auto-cpmplete for builtins
+char* builtin_generator(const char* text, int state) {
+    static int idx;
+    const char* name;
+
+    if (!state) idx = 0;
+
+    while ((name = builtins[idx++])) {
+        if (strncmp(name, text, strlen(text)) == 0) {
+            char* match = strdup(name);
+            return match;
+        }
+    }
+
+    return NULL;
+}
+
+char** completion_hook(const char* text, int start, int end) {
+    char** matches = rl_completion_matches(text, builtin_generator);
+
+    if (matches)
+        rl_insert_text(" "); 
+
+    return matches;
+}
+
 // Making a self tokeniser of ' ' adn " " and backslash escapes
 void tokenize(char* line, char* args[], int* argc_out) {
   int i = 0;
@@ -103,13 +135,18 @@ void tokenize(char* line, char* args[], int* argc_out) {
 int main(int argc, char* argv[]) {
   // Flush after every printf
   setbuf(stdout, NULL);
+  
+  rl_bind_key('\t', rl_complete);
+  rl_attempted_completion_function = completion_hook;
 
   while (1) {
-    printf("$ ");
-
-    char line[100];
-    if (fgets(line, sizeof(line), stdin) == NULL) {
-      continue;
+    char *line = readline("$ ");
+    if (line == NULL) {
+      printf("\n");
+      break;  // EOF
+    }
+    if (strlen(line)>0){
+      add_history(line);
     }
 
     line[strcspn(line, "\n")] = 0;  // Remove newline character
@@ -493,6 +530,7 @@ int main(int argc, char* argv[]) {
     }
 
     printf("%s: command not found\n", line);
+    free(line);
   }
   return 0;
 }
