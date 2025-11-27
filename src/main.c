@@ -128,6 +128,8 @@ int main(int argc, char* argv[]) {
       int redirect_stdout_index = -1;
       int redirect_stderr_index = -1;
       int append_stdout_index = -1;
+      int append_stderr_index = -1;
+      char* append_stderr_file = NULL;
       char * append_stdout_file = NULL;
       char* outfile = NULL;
       char* errfile = NULL;
@@ -140,6 +142,11 @@ int main(int argc, char* argv[]) {
         } else if (strcmp(args2[r], "2>") == 0) {
           redirect_stderr_index = r;
           errfile = args2[r + 1];
+          break;
+        }
+        else if (strcmp(args2[r], "2>>") == 0) {
+          append_stderr_index = r;
+          append_stderr_file = args2[r + 1];
           break;
         }
         else if (strcmp(args2[r], ">>") == 0 || strcmp(args2[r], "1>>") == 0) {
@@ -198,6 +205,21 @@ int main(int argc, char* argv[]) {
 
         args2[append_stdout_index] = NULL;
         argc_echo = append_stdout_index;
+      }
+      if (append_stderr_index!=-1){
+        int fd_err = open(append_stderr_file, O_WRONLY | O_CREAT | O_APPEND, 0666);
+        if (fd_err < 0) {
+          perror("open");
+          continue;
+        }
+
+        saved_stdout = dup(1);
+ 
+        dup2(fd_err, 2);
+        close(fd_err);
+
+        args2[append_stderr_index] = NULL;
+        argc_echo = append_stderr_index;
       }
 
       for (int k = 0; k < argc_echo; k++) {
@@ -346,7 +368,9 @@ int main(int argc, char* argv[]) {
       int redirect_stdout_index = -1;
       int redirect_stderr_index = -1;
       int append_stdout_index = -1;
+      int append_stderr_index = -1;
       char * append_stdout_file = NULL;
+      char * append_stderr_file = NULL;
       char* filename = NULL;
       char* errfile = NULL;
       for (int k = 0; k < argc2; k++) {
@@ -363,6 +387,11 @@ int main(int argc, char* argv[]) {
           append_stdout_index = k;
           append_stdout_file = args[k + 1];
           break;
+        } 
+        else if (strcmp(args[k], "2>>") == 0) {
+          append_stderr_index = k;
+          append_stderr_file = args[k + 1];
+          break;
         }
       }
       if (redirect_stdout_index != -1) {
@@ -373,6 +402,9 @@ int main(int argc, char* argv[]) {
       }
       if (append_stdout_index != -1) {
         args[append_stdout_index] = NULL;
+      }
+      if (append_stderr_index != -1) {
+        args[append_stderr_index] = NULL;
       }
       // Find the command in PATH
       char* cmd = args[0];
@@ -437,6 +469,15 @@ int main(int argc, char* argv[]) {
             exit(1);
           }
           dup2(fd, 1);
+          close(fd);
+        }
+        if (append_stderr_index != -1){
+          int fd = open(append_stderr_file, O_WRONLY | O_CREAT | O_APPEND, 0666);
+          if (fd < 0) {
+            perror("open");
+            exit(1);
+          }
+          dup2(fd, 2);
           close(fd);
         }
         execv(exec_path, args);
