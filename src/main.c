@@ -411,7 +411,8 @@ int main(int argc, char* argv[]) {
       char* cmd = line + 5;
       // check for builtins
       if (strcmp(cmd, "echo") == 0 || strcmp(cmd, "exit") == 0 || strcmp(cmd, "type") == 0 ||
-          strcmp(cmd, "pwd") == 0 || strncmp(cmd, "cd", 2) == 0 || strncmp(cmd, "history", 7) == 0) {
+          strcmp(cmd, "pwd") == 0 || strncmp(cmd, "cd", 2) == 0 ||
+          strncmp(cmd, "history", 7) == 0) {
         printf("%s is a shell builtin\n", cmd);
         continue;
       }
@@ -501,10 +502,28 @@ int main(int argc, char* argv[]) {
     }
 
     // HISTORY
-    else if (strcmp(line, "history") == 0) {
+    else if (strncmp(line, "history", 7) == 0) {
+      int limit = -1;  // -1 means show all
+
+      if (strlen(line) > 7 && line[7] == ' ') {
+        char* arg = line + 8;
+        limit = atoi(arg);
+      }
+
       HIST_ENTRY** hist_list = history_list();
       if (hist_list) {
-        for (int i = 0; hist_list[i] != NULL; i++) {
+        int total = 0;
+        while (hist_list[total] != NULL) {
+          total++;
+        }
+
+        // Calculate starting index
+        int start = 0;
+        if (limit > 0 && limit < total) {
+          start = total - limit;
+        }
+
+        for (int i = start; i < total; i++) {
           printf("%5d  %s\n", i + 1, hist_list[i]->line);
         }
       }
@@ -534,12 +553,12 @@ int main(int argc, char* argv[]) {
         // Split commands
         char* cmd1_args[20];
         char* cmd2_args[20];
-        
+
         for (int i = 0; i < pipe_index; i++) {
           cmd1_args[i] = args[i];
         }
         cmd1_args[pipe_index] = NULL;
-        
+
         int cmd2_argc = 0;
         for (int i = pipe_index + 1; i < argc2; i++) {
           cmd2_args[cmd2_argc++] = args[i];
@@ -609,7 +628,7 @@ int main(int argc, char* argv[]) {
 
         if (pid1 == 0) {
           // First child: write to pipe
-          close(pipefd[0]);  // Close read end
+          close(pipefd[0]);    // Close read end
           dup2(pipefd[1], 1);  // Redirect stdout to pipe write end
           close(pipefd[1]);
           execv(exec_path1, cmd1_args);
@@ -629,7 +648,7 @@ int main(int argc, char* argv[]) {
 
         if (pid2 == 0) {
           // Second child: read from pipe
-          close(pipefd[1]);  // Close write end
+          close(pipefd[1]);    // Close write end
           dup2(pipefd[0], 0);  // Redirect stdin to pipe read end
           close(pipefd[0]);
           execv(exec_path2, cmd2_args);
@@ -640,7 +659,7 @@ int main(int argc, char* argv[]) {
         // Parent: close both ends and wait for both children
         close(pipefd[0]);
         close(pipefd[1]);
-        
+
         int status1, status2;
         waitpid(pid1, &status1, 0);
         waitpid(pid2, &status2, 0);
