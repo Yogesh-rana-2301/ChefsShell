@@ -1,42 +1,168 @@
+#include <dirent.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <readline/history.h>
+#include <readline/readline.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include <readline/readline.h>
-#include <readline/history.h>
+// builtin commands
+const char* builtins[] = {"cd", "echo", "exit", "history", "pwd", NULL};
 
-//builtin commands
-const char* builtins[] = {"echo", "exit", NULL};
+char* combined_generator(const char* text, int state) {
+  static int stage;        // 0 = builtins, 1 = externals
+  static int builtin_idx;  // builtin index
 
-//auto-cpmplete for builtins
-char* builtin_generator(const char* text, int state) {
-    static int idx;
-    const char* name;
+  static char* path_copy = NULL;
+  static char* current_dir = NULL;
 
-    if (!state) idx = 0;
+  static DIR* d = NULL;
+  static struct dirent* entry = NULL;
 
-    while ((name = builtins[idx++])) {
-        if (strncmp(name, text, strlen(text)) == 0) {
-            char* match = strdup(name);
-            return match;
-        }
+  static char* saved_dir = NULL;
+
+  if (state == 0) {
+    stage = 0;
+    builtin_idx = 0;
+
+    if (path_copy) free(path_copy);
+
+    char* envpath = getenv("PATH");
+    path_copy = strdup(envpath ? envpath : "");
+
+    current_dir = strtok(path_copy, ":");
+
+    if (d) {
+      closedir(d);
+      d = NULL;
     }
 
-    return NULL;
+    saved_dir = NULL;
+  }
+
+  if (stage == 0) {
+    while (builtins[builtin_idx]) {
+      const char* name = builtins[builtin_idx++];
+      if (strncmp(name, text, strlen(text)) == 0) {
+        return strdup(name);
+      }
+    }
+    stage = 1;  // Move to external executables
+  }
+
+  while (current_dir || d) {
+    if (!d) {
+      saved_dir = current_dir;
+      d = opendir(current_dir);
+      current_dir = strtok(NULL, ":");
+    }
+
+    if (d) {
+      while ((entry = readdir(d)) != NULL) {
+        if (strncmp(entry->d_name, text, strlen(text)) == 0) {
+          char full[PATH_MAX];
+          snprintf(full, sizeof(full), "%s/%s", saved_dir, entry->d_name);
+
+          if (access(full, X_OK) == 0) {
+            return strdup(entry->d_name);
+          }
+        }
+      }
+
+      closedir(d);
+      d = NULL;
+      saved_dir = NULL;
+    }
+  }
+
+  // No more matches
+  return NULL;
+}
+
+// auto-cpmplete for builtins
+/*
+char* builtin_generator(const char* text, int state) {
+  static int idx;
+  const char* name;
+
+  if (!state) idx = 0;
+
+  while ((name = builtins[idx++])) {
+    if (strncmp(name, text, strlen(text)) == 0) {
+      char* match = strdup(name);
+      return match;
+    }
+  }
+
+  return NULL;
+}
+*/
+
+int is_external_prefix(const char* text) {
+  if (!text || text[0] == '\0') return 0;
+
+  char* path = getenv("PATH");
+  if (!path) return 0;
+
+  char* p = strdup(path);
+  char* dir = strtok(p, ":");
+
+  while (dir) {
+    DIR* d = opendir(dir);
+    if (d) {
+      struct dirent* entry;
+      while ((entry = readdir(d)) != NULL) {
+        // match prefix
+        if (strncmp(entry->d_name, text, strlen(text)) == 0) {
+          // build full path
+          char full[PATH_MAX];
+          snprintf(full, sizeof(full), "%s/%s", dir, entry->d_name);
+
+          // check if executable
+          if (access(full, X_OK) == 0) {
+            closedir(d);
+            free(p);
+            return 1;  // found at least one external match
+          }
+        }
+      }
+      closedir(d);
+    }
+    dir = strtok(NULL, ":");
+  }
+
+  free(p);
+  return 0;
+}
+
+int is_builtin_prefix(const char* text) {
+  for (int i = 0; builtins[i] != NULL; i++) {
+    if (strncmp(builtins[i], text, strlen(text)) == 0) {
+      return 1;
+    }
+  }
+  return 0;
 }
 
 char** completion_hook(const char* text, int start, int end) {
-    char** matches = rl_completion_matches(text, builtin_generator);
+  if (!is_builtin_prefix(text) && !is_external_prefix(text)) {
+    // Bell character
+    printf("\x07");
+    fflush(stdout);
 
-    if (matches)
-        rl_insert_text(" "); 
+    return NULL;  // No autocomplete
+  }
 
-    return matches;
+  char** matches = rl_completion_matches(text, combined_generator);
+
+  if (matches && matches[0] != NULL) rl_insert_text(" ");
+
+  return matches;
 }
 
 // Making a self tokeniser of ' ' adn " " and backslash escapes
@@ -135,17 +261,17 @@ void tokenize(char* line, char* args[], int* argc_out) {
 int main(int argc, char* argv[]) {
   // Flush after every printf
   setbuf(stdout, NULL);
-  
+
   rl_bind_key('\t', rl_complete);
   rl_attempted_completion_function = completion_hook;
 
   while (1) {
-    char *line = readline("$ ");
+    char* line = readline("$ ");
     if (line == NULL) {
       printf("\n");
       break;  // EOF
     }
-    if (strlen(line)>0){
+    if (strlen(line) > 0) {
       add_history(line);
     }
 
@@ -167,7 +293,7 @@ int main(int argc, char* argv[]) {
       int append_stdout_index = -1;
       int append_stderr_index = -1;
       char* append_stderr_file = NULL;
-      char * append_stdout_file = NULL;
+      char* append_stdout_file = NULL;
       char* outfile = NULL;
       char* errfile = NULL;
 
@@ -180,13 +306,11 @@ int main(int argc, char* argv[]) {
           redirect_stderr_index = r;
           errfile = args2[r + 1];
           break;
-        }
-        else if (strcmp(args2[r], "2>>") == 0) {
+        } else if (strcmp(args2[r], "2>>") == 0) {
           append_stderr_index = r;
           append_stderr_file = args2[r + 1];
           break;
-        }
-        else if (strcmp(args2[r], ">>") == 0 || strcmp(args2[r], "1>>") == 0) {
+        } else if (strcmp(args2[r], ">>") == 0 || strcmp(args2[r], "1>>") == 0) {
           append_stdout_index = r;
           append_stdout_file = args2[r + 1];
           break;
@@ -221,14 +345,14 @@ int main(int argc, char* argv[]) {
         }
 
         saved_stdout = dup(1);
- 
+
         dup2(fd_err, 2);
         close(fd_err);
 
         args2[redirect_stderr_index] = NULL;
         argc_echo = redirect_stderr_index;
       }
-      if (append_stdout_index!=-1){
+      if (append_stdout_index != -1) {
         fd = open(append_stdout_file, O_WRONLY | O_CREAT | O_APPEND, 0666);
         if (fd < 0) {
           perror("open");
@@ -243,7 +367,7 @@ int main(int argc, char* argv[]) {
         args2[append_stdout_index] = NULL;
         argc_echo = append_stdout_index;
       }
-      if (append_stderr_index!=-1){
+      if (append_stderr_index != -1) {
         int fd_err = open(append_stderr_file, O_WRONLY | O_CREAT | O_APPEND, 0666);
         if (fd_err < 0) {
           perror("open");
@@ -251,7 +375,7 @@ int main(int argc, char* argv[]) {
         }
 
         saved_stdout = dup(1);
- 
+
         dup2(fd_err, 2);
         close(fd_err);
 
@@ -406,8 +530,8 @@ int main(int argc, char* argv[]) {
       int redirect_stderr_index = -1;
       int append_stdout_index = -1;
       int append_stderr_index = -1;
-      char * append_stdout_file = NULL;
-      char * append_stderr_file = NULL;
+      char* append_stdout_file = NULL;
+      char* append_stderr_file = NULL;
       char* filename = NULL;
       char* errfile = NULL;
       for (int k = 0; k < argc2; k++) {
@@ -419,13 +543,11 @@ int main(int argc, char* argv[]) {
           redirect_stderr_index = k;
           errfile = args[k + 1];
           break;
-        }
-        else if (strcmp(args[k], ">>") == 0 || strcmp(args[k], "1>>") == 0) {
+        } else if (strcmp(args[k], ">>") == 0 || strcmp(args[k], "1>>") == 0) {
           append_stdout_index = k;
           append_stdout_file = args[k + 1];
           break;
-        } 
-        else if (strcmp(args[k], "2>>") == 0) {
+        } else if (strcmp(args[k], "2>>") == 0) {
           append_stderr_index = k;
           append_stderr_file = args[k + 1];
           break;
@@ -499,7 +621,7 @@ int main(int argc, char* argv[]) {
           dup2(fd, 2);
           close(fd);
         }
-        if (append_stdout_index != -1){
+        if (append_stdout_index != -1) {
           int fd = open(append_stdout_file, O_WRONLY | O_CREAT | O_APPEND, 0666);
           if (fd < 0) {
             perror("open");
@@ -508,7 +630,7 @@ int main(int argc, char* argv[]) {
           dup2(fd, 1);
           close(fd);
         }
-        if (append_stderr_index != -1){
+        if (append_stderr_index != -1) {
           int fd = open(append_stderr_file, O_WRONLY | O_CREAT | O_APPEND, 0666);
           if (fd < 0) {
             perror("open");
