@@ -500,6 +500,17 @@ int main(int argc, char* argv[]) {
       continue;
     }
 
+    // HISTORY
+    else if (strcmp(line, "history") == 0) {
+      HIST_ENTRY** hist_list = history_list();
+      if (hist_list) {
+        for (int i = 0; hist_list[i] != NULL; i++) {
+          printf("%5d  %s\n", i + 1, hist_list[i]->line);
+        }
+      }
+      continue;
+    }
+
     // EXTERNAL COMMANDS FOR RUNNIGN A PROGRAM
     {
       char* args[20];
