@@ -263,6 +263,7 @@ void save_history_to_file(const char* filepath) {
   
   FILE* fp = fopen(filepath, "w");
   if (!fp) return;
+   
   
   HIST_ENTRY** hist_list = history_list();
   if (hist_list) {
@@ -272,6 +273,72 @@ void save_history_to_file(const char* filepath) {
   }
   
   fclose(fp);
+}
+
+int is_builtin(const char* cmd) {
+  return (strcmp(cmd, "echo") == 0 || 
+          strcmp(cmd, "type") == 0 || 
+          strcmp(cmd, "pwd") == 0 ||
+          strcmp(cmd, "cd") == 0 ||
+          strcmp(cmd, "exit") == 0 ||
+          strcmp(cmd, "history") == 0);
+}
+
+void execute_builtin_in_child(char* args[]) {
+  char* cmd = args[0];
+  
+  if (strcmp(cmd, "echo") == 0) {
+    // Count args
+    int count = 0;
+    while (args[count] != NULL) count++;
+    
+    for (int i = 1; i < count; i++) {
+      printf("%s", args[i]);
+      if (i < count - 1) printf(" ");
+    }
+    printf("\n");
+  }
+  else if (strcmp(cmd, "type") == 0) {
+    if (args[1] == NULL) {
+      exit(0);
+    }
+    char* target = args[1];
+    
+    if (is_builtin(target)) {
+      printf("%s is a shell builtin\n", target);
+    } else {
+      // Check PATH
+      char* path = getenv("PATH");
+      if (path == NULL) path = "";
+      char path_cpy[1000];
+      strncpy(path_cpy, path, sizeof(path_cpy));
+      path_cpy[sizeof(path_cpy) - 1] = '\0';
+      
+      char* dir = strtok(path_cpy, ":");
+      int found = 0;
+      
+      while (dir != NULL) {
+        char fullpath[1200];
+        snprintf(fullpath, sizeof(fullpath), "%s/%s", dir, target);
+        
+        if (access(fullpath, X_OK) == 0) {
+          printf("%s is %s\n", target, fullpath);
+          found = 1;
+          break;
+        }
+        dir = strtok(NULL, ":");
+      }
+      if (!found) {
+        printf("%s: not found\n", target);
+      }
+    }
+  }
+  else if (strcmp(cmd, "pwd") == 0) {
+    char cwd[1000];
+    if (getcwd(cwd, sizeof(cwd)) != NULL) {
+      printf("%s\n", cwd);
+    }
+  }
 }
 
 int main(int argc, char* argv[]) {
@@ -684,49 +751,60 @@ int main(int argc, char* argv[]) {
         }
         cmd2_args[cmd2_argc] = NULL;
 
-        // Find executables in PATH
-        char* path = getenv("PATH");
-        if (path == NULL) path = "";
+        // Check if commands are built-ins or external
+        int cmd1_is_builtin = is_builtin(cmd1_args[0]);
+        int cmd2_is_builtin = is_builtin(cmd2_args[0]);
 
-        char path_cpy1[1000], path_cpy2[1000];
-        strncpy(path_cpy1, path, sizeof(path_cpy1));
-        strncpy(path_cpy2, path, sizeof(path_cpy2));
-        path_cpy1[sizeof(path_cpy1) - 1] = '\0';
-        path_cpy2[sizeof(path_cpy2) - 1] = '\0';
-
-        // Find first command
+        // Find external executables if needed
         char exec_path1[1200] = {0};
-        int found1 = 0;
-        char* dir = strtok(path_cpy1, ":");
-        while (dir != NULL) {
-          snprintf(exec_path1, sizeof(exec_path1), "%s/%s", dir, cmd1_args[0]);
-          if (access(exec_path1, X_OK) == 0) {
-            found1 = 1;
-            break;
-          }
-          dir = strtok(NULL, ":");
-        }
-
-        // Find second command
         char exec_path2[1200] = {0};
-        int found2 = 0;
-        dir = strtok(path_cpy2, ":");
-        while (dir != NULL) {
-          snprintf(exec_path2, sizeof(exec_path2), "%s/%s", dir, cmd2_args[0]);
-          if (access(exec_path2, X_OK) == 0) {
-            found2 = 1;
-            break;
+        
+        if (!cmd1_is_builtin) {
+          char* path = getenv("PATH");
+          if (path == NULL) path = "";
+          char path_cpy1[1000];
+          strncpy(path_cpy1, path, sizeof(path_cpy1));
+          path_cpy1[sizeof(path_cpy1) - 1] = '\0';
+          
+          int found1 = 0;
+          char* dir = strtok(path_cpy1, ":");
+          while (dir != NULL) {
+            snprintf(exec_path1, sizeof(exec_path1), "%s/%s", dir, cmd1_args[0]);
+            if (access(exec_path1, X_OK) == 0) {
+              found1 = 1;
+              break;
+            }
+            dir = strtok(NULL, ":");
           }
-          dir = strtok(NULL, ":");
+          
+          if (!found1) {
+            printf("%s: command not found\n", cmd1_args[0]);
+            continue;
+          }
         }
 
-        if (!found1) {
-          printf("%s: command not found\n", cmd1_args[0]);
-          continue;
-        }
-        if (!found2) {
-          printf("%s: command not found\n", cmd2_args[0]);
-          continue;
+        if (!cmd2_is_builtin) {
+          char* path = getenv("PATH");
+          if (path == NULL) path = "";
+          char path_cpy2[1000];
+          strncpy(path_cpy2, path, sizeof(path_cpy2));
+          path_cpy2[sizeof(path_cpy2) - 1] = '\0';
+          
+          int found2 = 0;
+          char* dir = strtok(path_cpy2, ":");
+          while (dir != NULL) {
+            snprintf(exec_path2, sizeof(exec_path2), "%s/%s", dir, cmd2_args[0]);
+            if (access(exec_path2, X_OK) == 0) {
+              found2 = 1;
+              break;
+            }
+            dir = strtok(NULL, ":");
+          }
+          
+          if (!found2) {
+            printf("%s: command not found\n", cmd2_args[0]);
+            continue;
+          }
         }
 
         // Create pipe
@@ -750,9 +828,15 @@ int main(int argc, char* argv[]) {
           close(pipefd[0]);    // Close read end
           dup2(pipefd[1], 1);  // Redirect stdout to pipe write end
           close(pipefd[1]);
-          execv(exec_path1, cmd1_args);
-          perror("execv failed");
-          exit(1);
+          
+          if (cmd1_is_builtin) {
+            execute_builtin_in_child(cmd1_args);
+            exit(0);
+          } else {
+            execv(exec_path1, cmd1_args);
+            perror("execv failed");
+            exit(1);
+          }
         }
 
         // Fork second command
@@ -770,9 +854,15 @@ int main(int argc, char* argv[]) {
           close(pipefd[1]);    // Close write end
           dup2(pipefd[0], 0);  // Redirect stdin to pipe read end
           close(pipefd[0]);
-          execv(exec_path2, cmd2_args);
-          perror("execv failed");
-          exit(1);
+          
+          if (cmd2_is_builtin) {
+            execute_builtin_in_child(cmd2_args);
+            exit(0);
+          } else {
+            execv(exec_path2, cmd2_args);
+            perror("execv failed");
+            exit(1);
+          }
         }
 
         // Parent: close both ends and wait for both children
