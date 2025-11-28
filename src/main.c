@@ -504,6 +504,34 @@ int main(int argc, char* argv[]) {
     // HISTORY
     else if (strncmp(line, "history", 7) == 0) {
 
+      // 
+
+      // write history to file
+      if (strncmp(line, "history -w ", 11) == 0) {
+        char* filepath = line + 11;
+
+        FILE* fp = fopen(filepath, "w");
+        if (!fp) {
+          printf("history: cannot open %s\n", filepath);
+          continue;
+        }
+
+        HIST_ENTRY** hist_list = history_list();
+        if (hist_list) {
+          int total = 0;
+          while (hist_list[total] != NULL) {
+            total++;
+          }
+
+          for (int i = 0; i < total; i++) {
+            fprintf(fp, "%s\n", hist_list[i]->line);
+          }
+        }
+
+        fclose(fp);
+        continue;
+      }
+
       // Case: history -r <file>
       if (strncmp(line, "history -r ", 11) == 0) {
         char* filepath = line + 11;
