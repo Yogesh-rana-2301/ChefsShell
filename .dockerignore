@@ -1,0 +1,10 @@
+# Docker Build
+deploy/node_modules/
+node_modules/
+npm-debug.log*
+.npm
+
+# Build artifacts  
+chefs_shell
+*.o
+*.out
