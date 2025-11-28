@@ -149,10 +149,24 @@ int is_builtin_prefix(const char* text) {
   return 0;
 }
 
+// display function for multiple matches
+void display_matches_hook(char** matches, int num_matches, int max_length) {
+  
+  printf("\n");
+  for (int i = 1; i <= num_matches; i++) {
+    printf("%s", matches[i]);
+    if (i < num_matches) {
+      printf("  ");  // 2 spaces between matches
+    }
+  }
+  printf("\n");
+  rl_forced_update_display();
+}
+
 char** completion_hook(const char* text, int start, int end) {
   if (!is_builtin_prefix(text) && !is_external_prefix(text)) {
     // Bell character
-    printf("\x07");
+    printf("\a");
     fflush(stdout);
 
     return NULL;  // No autocomplete
@@ -160,7 +174,10 @@ char** completion_hook(const char* text, int start, int end) {
 
   char** matches = rl_completion_matches(text, combined_generator);
 
-  if (matches && matches[0] != NULL) rl_insert_text(" ");
+  // If there's only one match, add a space after it
+  if (matches && matches[1] != NULL && matches[2] == NULL) {
+    rl_insert_text(" ");
+  }
 
   return matches;
 }
@@ -347,6 +364,7 @@ int main(int argc, char* argv[]) {
 
   rl_bind_key('\t', rl_complete);
   rl_attempted_completion_function = completion_hook;
+  rl_completion_display_matches_hook = display_matches_hook;
 
   int last_appended_index = 0;  // Track last appended history entry
 
@@ -737,6 +755,152 @@ int main(int argc, char* argv[]) {
         continue;
       }
 
+      // Check for pipelines - count how many pipes we have
+      int pipe_count = 0;
+      int pipe_positions[10];
+      for (int k = 0; k < argc2; k++) {
+        if (strcmp(args[k], "|") == 0) {
+          pipe_positions[pipe_count++] = k;
+        }
+      }
+
+      // Handle pipeline 
+      if (pipe_count > 0) {
+        // Split into commands
+        char* commands[11][20];  // Max 11 commands (10 pipes + 1)
+        int cmd_count = pipe_count + 1;
+        
+        // First command
+        int start = 0;
+        for (int i = 0; i < pipe_positions[0]; i++) {
+          commands[0][i] = args[i];
+        }
+        commands[0][pipe_positions[0]] = NULL;
+        
+        // Middle commands
+        for (int c = 1; c < pipe_count; c++) {
+          start = pipe_positions[c - 1] + 1;
+          int idx = 0;
+          for (int i = start; i < pipe_positions[c]; i++) {
+            commands[c][idx++] = args[i];
+          }
+          commands[c][idx] = NULL;
+        }
+        
+        // Last command
+        start = pipe_positions[pipe_count - 1] + 1;
+        int idx = 0;
+        for (int i = start; i < argc2; i++) {
+          commands[cmd_count - 1][idx++] = args[i];
+        }
+        commands[cmd_count - 1][idx] = NULL;
+
+        // Check which commands are built-ins and find executables for external ones
+        int cmd_is_builtin[11];
+        char exec_paths[11][1200];
+        
+        for (int c = 0; c < cmd_count; c++) {
+          cmd_is_builtin[c] = is_builtin(commands[c][0]);
+          
+          if (!cmd_is_builtin[c]) {
+            
+            char* path = getenv("PATH");
+            if (path == NULL) path = "";
+            char path_cpy[1000];
+            strncpy(path_cpy, path, sizeof(path_cpy));
+            path_cpy[sizeof(path_cpy) - 1] = '\0';
+            
+            int found = 0;
+            char* dir = strtok(path_cpy, ":");
+            while (dir != NULL) {
+              snprintf(exec_paths[c], sizeof(exec_paths[c]), "%s/%s", dir, commands[c][0]);
+              if (access(exec_paths[c], X_OK) == 0) {
+                found = 1;
+                break;
+              }
+              dir = strtok(NULL, ":");
+            }
+            
+            if (!found) {
+              printf("%s: command not found\n", commands[c][0]);
+              goto pipeline_cleanup;
+            }
+          }
+        }
+
+        // Create pipes
+        int pipes[10][2];  // Max 10 pipes for 11 commands
+        for (int i = 0; i < pipe_count; i++) {
+          if (pipe(pipes[i]) == -1) {
+            perror("pipe");
+            // Close already created pipes
+            for (int j = 0; j < i; j++) {
+              close(pipes[j][0]);
+              close(pipes[j][1]);
+            }
+            goto pipeline_cleanup;
+          }
+        }
+
+        pid_t pids[11];
+        for (int c = 0; c < cmd_count; c++) {
+          pids[c] = fork();
+          
+          if (pids[c] < 0) {
+            perror("fork");
+            // Close all pipes
+            for (int i = 0; i < pipe_count; i++) {
+              close(pipes[i][0]);
+              close(pipes[i][1]);
+            }
+            for (int j = 0; j < c; j++) {
+              waitpid(pids[j], NULL, 0);
+            }
+            goto pipeline_cleanup;
+          }
+          
+          if (pids[c] == 0) {
+            //  read from previous pipe (except first command)
+            if (c > 0) {
+              dup2(pipes[c - 1][0], 0);
+            }
+            
+            // write to next pipe (except last command)
+            if (c < cmd_count - 1) {
+              dup2(pipes[c][1], 1);
+            }
+            
+            // Close all pipe file descriptors in child
+            for (int i = 0; i < pipe_count; i++) {
+              close(pipes[i][0]);
+              close(pipes[i][1]);
+            }
+            
+            if (cmd_is_builtin[c]) {
+              execute_builtin_in_child(commands[c]);
+              exit(0);
+            } else {
+              execv(exec_paths[c], commands[c]);
+              perror("execv failed");
+              exit(1);
+            }
+          }
+        }
+        
+        for (int i = 0; i < pipe_count; i++) {
+          close(pipes[i][0]);
+          close(pipes[i][1]);
+        }
+        
+        for (int c = 0; c < cmd_count; c++) {
+          waitpid(pids[c], NULL, 0);
+        }
+        
+        pipeline_cleanup:
+        continue;
+      }
+
+      /* OLD TWO-COMMAND PIPELINE CODE
       // Check for pipeline
       int pipe_index = -1;
       for (int k = 0; k < argc2; k++) {
@@ -887,6 +1051,7 @@ int main(int argc, char* argv[]) {
 
         continue;
       }
+      */
 
       // Alternative tokenization
       /*
