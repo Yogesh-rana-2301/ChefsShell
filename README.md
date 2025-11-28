@@ -5,14 +5,9 @@ it is a lightweight Unix-compatible shell written in C, designed to mimic the be
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Language: C](https://img.shields.io/badge/Language-C-blue.svg)](<https://en.wikipedia.org/wiki/C_(programming_language)>)
 [![Platform: Unix-like](https://img.shields.io/badge/Platform-Unix--like-lightgrey.svg)](https://en.wikipedia.org/wiki/Unix-like)
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
 
 > The file `src/main.c` is the main file for the whole shell and is responsible for the whole functionality of it. It has been authored by me. The shell would work fine on local. <br>The deployment on the web browser have been vibe code as I am not well versed with xterm.js and with the deployment of such shell program online. So in case of any issues with the web browser version kindly open issues in the issue tab.  
 > Vibe code alert for that part.
-
-## 🌐 Try it Live!
-
-**[Launch ChefsShell in Browser →](https://your-app.onrender.com)** (Deploy first - see [RENDER_DEPLOY.md](RENDER_DEPLOY.md))
 
 ## Overview
 
