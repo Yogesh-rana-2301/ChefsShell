@@ -1,3 +1,5 @@
+#define _XOPEN_SOURCE 700
+#define _GNU_SOURCE
 #include <dirent.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -151,7 +153,7 @@ int is_builtin_prefix(const char* text) {
 
 // display function for multiple matches
 void display_matches_hook(char** matches, int num_matches, int max_length) {
-  
+  (void)max_length;  // Unused parameter
   printf("\n");
   for (int i = 1; i <= num_matches; i++) {
     printf("%s", matches[i]);
@@ -164,6 +166,8 @@ void display_matches_hook(char** matches, int num_matches, int max_length) {
 }
 
 char** completion_hook(const char* text, int start, int end) {
+  (void)start;  // Unused parameter
+  (void)end;    // Unused parameter
   if (!is_builtin_prefix(text) && !is_external_prefix(text)) {
     // Bell character
     printf("\a");
@@ -281,11 +285,11 @@ void save_history_to_file(const char* filepath) {
   FILE* fp = fopen(filepath, "w");
   if (!fp) return;
    
-  
-  HIST_ENTRY** hist_list = history_list();
-  if (hist_list) {
-    for (int i = 0; hist_list[i] != NULL; i++) {
-      fprintf(fp, "%s\n", hist_list[i]->line);
+  int len = history_length;
+  for (int i = 0; i < len; i++) {
+    HIST_ENTRY* entry = history_get(i + 1);
+    if (entry) {
+      fprintf(fp, "%s\n", entry->line);
     }
   }
   
@@ -359,12 +363,15 @@ void execute_builtin_in_child(char* args[]) {
 }
 
 int main(int argc, char* argv[]) {
+  (void)argc;  // Unused parameter
+  (void)argv;  // Unused parameter
   // Flush after every printf
   setbuf(stdout, NULL);
 
   rl_bind_key('\t', rl_complete);
   rl_attempted_completion_function = completion_hook;
-  rl_completion_display_matches_hook = display_matches_hook;
+  // Skip setting display hook as it causes type compatibility issues
+  // rl_completion_display_matches_hook = display_matches_hook;
 
   int last_appended_index = 0;  // Track last appended history entry
 
@@ -649,19 +656,15 @@ int main(int argc, char* argv[]) {
           continue;
         }
 
-        HIST_ENTRY** hist_list = history_list();
-        if (hist_list) {
-          int total = 0;
-          while (hist_list[total] != NULL) {
-            total++;
+        int total = history_length;
+        for (int i = last_appended_index; i < total; i++) {
+          HIST_ENTRY* entry = history_get(i + 1);
+          if (entry) {
+            fprintf(fp, "%s\n", entry->line);
           }
-          for (int i = last_appended_index; i < total; i++) {
-            fprintf(fp, "%s\n", hist_list[i]->line);
-          }
-          
-          
-          last_appended_index = total;
         }
+        
+        last_appended_index = total;
 
         fclose(fp);
         continue;
@@ -677,15 +680,11 @@ int main(int argc, char* argv[]) {
           continue;
         }
 
-        HIST_ENTRY** hist_list = history_list();
-        if (hist_list) {
-          int total = 0;
-          while (hist_list[total] != NULL) {
-            total++;
-          }
-
-          for (int i = 0; i < total; i++) {
-            fprintf(fp, "%s\n", hist_list[i]->line);
+        int total = history_length;
+        for (int i = 0; i < total; i++) {
+          HIST_ENTRY* entry = history_get(i + 1);
+          if (entry) {
+            fprintf(fp, "%s\n", entry->line);
           }
         }
 
@@ -726,21 +725,18 @@ int main(int argc, char* argv[]) {
         limit = atoi(arg);
       }
 
-      HIST_ENTRY** hist_list = history_list();
-      if (hist_list) {
-        int total = 0;
-        while (hist_list[total] != NULL) {
-          total++;
-        }
+      int total = history_length;
+      
+      // Calculate starting index
+      int start = 0;
+      if (limit > 0 && limit < total) {
+        start = total - limit;
+      }
 
-        // Calculate starting index
-        int start = 0;
-        if (limit > 0 && limit < total) {
-          start = total - limit;
-        }
-
-        for (int i = start; i < total; i++) {
-          printf("%5d  %s\n", i + 1, hist_list[i]->line);
+      for (int i = start; i < total; i++) {
+        HIST_ENTRY* entry = history_get(i + 1);
+        if (entry) {
+          printf("%5d  %s\n", i + 1, entry->line);
         }
       }
       continue;

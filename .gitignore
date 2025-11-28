@@ -59,3 +59,15 @@ vcpkg_installed
 # Compiled binaries (no extension)
 01_main
 01_
+chefs_shell
+
+# Python virtual environment
+myenv/
+venv/
+*.pyc
+__pycache__/
+
+# Node.js (for web deployment)
+deploy/node_modules/
+*.log
+npm-debug.log*

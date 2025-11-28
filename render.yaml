@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: chefs-shell
+    runtime: node
+    region: oregon
+    plan: free
+    buildCommand: cd deploy && npm install && cd .. && make -f deploy/Makefile
+    startCommand: cd deploy && npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 18.17.0
+      - key: PORT
+        value: 3000
+    healthCheckPath: /

@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ChefsShell 🍳</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css"
+    />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Courier New", monospace;
+        background: linear-gradient(135deg, #000000 0%, #000000 100%);
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+
+      .header {
+        text-align: center;
+        color: white;
+        margin-bottom: 20px;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+      }
+
+      .header h1 {
+        font-size: 2.5rem;
+        margin-bottom: 10px;
+      }
+
+      .header p {
+        font-size: 1rem;
+        opacity: 0.9;
+      }
+
+      .terminal-container {
+        background: #1e1e1e;
+        border-radius: 12px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        overflow: hidden;
+        max-width: 1200px;
+        width: 100%;
+        max-height: 80vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .terminal-header {
+        background: #323232;
+        padding: 10px 15px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .terminal-button {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+      }
+
+      .btn-close {
+        background: #ff5f56;
+      }
+      .btn-minimize {
+        background: #ffbd2e;
+      }
+      .btn-maximize {
+        background: #27c93f;
+      }
+
+      .terminal-title {
+        color: #ccc;
+        font-size: 0.9rem;
+        margin-left: 10px;
+      }
+
+      #terminal {
+        padding: 15px;
+        flex: 1;
+        overflow: auto;
+      }
+
+      .status {
+        text-align: center;
+        color: white;
+        margin-top: 15px;
+        font-size: 0.9rem;
+        opacity: 0.8;
+      }
+
+      .status.connected {
+        color: #27c93f;
+      }
+
+      .status.disconnected {
+        color: #ff5f56;
+      }
+
+      .status.connecting {
+        color: #ffbd2e;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>🍳 ChefsShell</h1>
+      <p>Your C mini-shell, running live in the browser</p>
+    </div>
+
+    <div class="terminal-container">
+      <div class="terminal-header">
+        <div class="terminal-button btn-close"></div>
+        <div class="terminal-button btn-minimize"></div>
+        <div class="terminal-button btn-maximize"></div>
+        <span class="terminal-title">ChefsShell Terminal</span>
+      </div>
+      <div id="terminal"></div>
+    </div>
+
+    <div id="status" class="status connecting">Connecting...</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.js"></script>
+    <script>
+      // Initialize xterm.js
+      const term = new Terminal({
+        cursorBlink: true,
+        fontSize: 14,
+        fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+        theme: {
+          background: "#1e1e1e",
+          foreground: "#d4d4d4",
+          cursor: "#ffffff",
+          black: "#000000",
+          red: "#cd3131",
+          green: "#0dbc79",
+          yellow: "#e5e510",
+          blue: "#2472c8",
+          magenta: "#bc3fbc",
+          cyan: "#11a8cd",
+          white: "#e5e5e5",
+          brightBlack: "#666666",
+          brightRed: "#f14c4c",
+          brightGreen: "#23d18b",
+          brightYellow: "#f5f543",
+          brightBlue: "#3b8eea",
+          brightMagenta: "#d670d6",
+          brightCyan: "#29b8db",
+          brightWhite: "#e5e5e5",
+        },
+        allowProposedApi: true,
+      });
+
+      // Add fit addon for responsive terminal
+      const fitAddon = new FitAddon.FitAddon();
+      term.loadAddon(fitAddon);
+
+      // Add web links addon to make URLs clickable
+      const webLinksAddon = new WebLinksAddon.WebLinksAddon();
+      term.loadAddon(webLinksAddon);
+
+      // Open terminal in the DOM
+      term.open(document.getElementById("terminal"));
+      fitAddon.fit();
+
+      // Status element
+      const statusEl = document.getElementById("status");
+
+      // WebSocket connection
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const ws = new WebSocket(`${protocol}//${window.location.host}`);
+
+      ws.onopen = () => {
+        console.log("WebSocket connected");
+        statusEl.textContent = "✓ Connected";
+        statusEl.className = "status connected";
+      };
+
+      ws.onmessage = (event) => {
+        term.write(event.data);
+      };
+
+      ws.onerror = (error) => {
+        console.error("WebSocket error:", error);
+        statusEl.textContent = "✗ Connection Error";
+        statusEl.className = "status disconnected";
+      };
+
+      ws.onclose = () => {
+        console.log("WebSocket disconnected");
+        statusEl.textContent = "✗ Disconnected";
+        statusEl.className = "status disconnected";
+        term.write("\r\n\n[Connection closed. Refresh to reconnect.]\r\n");
+      };
+
+      // Send terminal input to WebSocket
+      term.onData((data) => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(data);
+        }
+      });
+
+      // Handle terminal resize
+      term.onResize(({ cols, rows }) => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "resize", cols, rows }));
+        }
+      });
+
+      // Fit terminal on window resize
+      window.addEventListener("resize", () => {
+        fitAddon.fit();
+      });
+
+      // Initial fit
+      setTimeout(() => {
+        fitAddon.fit();
+      }, 100);
+    </script>
+  </body>
+</html>

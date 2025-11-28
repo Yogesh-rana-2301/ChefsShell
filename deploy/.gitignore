@@ -1,0 +1,19 @@
+# Node.js dependencies
+node_modules/
+
+# Build artifacts
+../chefs_shell
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

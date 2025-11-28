@@ -1,10 +1,18 @@
-# ChefsShell  ♛
+# ChefsShell ♛
 
 it is a lightweight Unix-compatible shell written in C, designed to mimic the behavior of traditional shells like `bash` and `sh`.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Language: C](https://img.shields.io/badge/Language-C-blue.svg)](https://en.wikipedia.org/wiki/C_(programming_language))
+[![Language: C](https://img.shields.io/badge/Language-C-blue.svg)](<https://en.wikipedia.org/wiki/C_(programming_language)>)
 [![Platform: Unix-like](https://img.shields.io/badge/Platform-Unix--like-lightgrey.svg)](https://en.wikipedia.org/wiki/Unix-like)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
+
+> The file `src/main.c` is the main file for the whole shell and is responsible for the whole functionality of it. It has been authored by me. The shell would work fine on local. <br>The deployment on the web browser have been vibe code as I am not well versed with xterm.js and with the deployment of such shell program online. So in case of any issues with the web browser version kindly open issues in the issue tab.  
+> Vibe code alert for that part.
+
+## 🌐 Try it Live!
+
+**[Launch ChefsShell in Browser →](https://your-app.onrender.com)** (Deploy first - see [RENDER_DEPLOY.md](RENDER_DEPLOY.md))
 
 ## Overview
 
@@ -20,15 +28,16 @@ ChefsShell is a functional command-line interpreter that will be supporting 10+ 
 - **Error Handling**: Clear error messages for invalid commands or missing executables
 - **Scalable Codebase**: Modular design for easy extension
 
-##  Getting Started
+## Getting Started
 
 ### Prerequisites
 
 You need:
+
 - **GCC** or **Clang** compiler
 - **Linux** or **macOS** terminal
 
-Clone the repository 
+Clone the repository
 
 ### Build
 
@@ -88,6 +97,7 @@ $ ./file
 ### Modular & OOP-Inspired Architecture
 
 Although written in C, the project uses object-oriented design principles:
+
 - Separation of concerns across modules
 - Struct-based modular design
 - Clear abstraction boundaries between components
@@ -96,17 +106,18 @@ Although written in C, the project uses object-oriented design principles:
 
 ChefsShell leverages essential Unix system calls:
 
-| System Call | Purpose |
-|------------|---------|
-| `fork()` | Create child process |
-| `execvp()` | Execute external program |
-| `waitpid()` | Process synchronization |
-| `getcwd()` | Get current working directory (for `pwd`) |
-| `chdir()` | Change directory (for `cd`) |
+| System Call | Purpose                                   |
+| ----------- | ----------------------------------------- |
+| `fork()`    | Create child process                      |
+| `execvp()`  | Execute external program                  |
+| `waitpid()` | Process synchronization                   |
+| `getcwd()`  | Get current working directory (for `pwd`) |
+| `chdir()`   | Change directory (for `cd`)               |
 
 ### Memory Optimization
 
 Effective use of:
+
 - Dynamic allocation (`malloc`, `realloc`)
 - Manual garbage cleanup
 - Avoiding leaks using structured free logic
@@ -150,17 +161,17 @@ $ ./chefshell
 $ echo $?  # Check exit status
 ```
 
-##  License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-##  Acknowledgements
+## Acknowledgements
 
 - Unix manual pages and POSIX standards
 - GNU Bash implementation details
 - Codecrafters Build your own X
 - The Unix philosophy of doing one thing well
 
-##  Contact
+## Contact
 
 For questions or suggestions, please open an issue on GitHub.
