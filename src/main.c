@@ -503,9 +503,36 @@ int main(int argc, char* argv[]) {
 
     // HISTORY
     else if (strncmp(line, "history", 7) == 0) {
+
+      // Case: history -r <file>
+      if (strncmp(line, "history -r ", 11) == 0) {
+        char* filepath = line + 11;
+
+        FILE* fp = fopen(filepath, "r");
+        if (!fp) {
+          printf("history: cannot open %s\n", filepath);
+          continue;
+        }
+
+        char buf[1024];
+        while (fgets(buf, sizeof(buf), fp)) {
+          // remove newline
+          buf[strcspn(buf, "\n")] = 0;
+
+          // skip empty lines
+          if (strlen(buf) == 0) continue;
+
+          add_history(buf);
+        }
+
+        fclose(fp);
+        continue;
+      }
+
       int limit = -1;  // -1 means show all
 
-      if (strlen(line) > 7 && line[7] == ' ') {
+    
+      if (strlen(line) > 7 && line[7] == ' ' && line[8] >= '0' && line[8] <= '9') {
         char* arg = line + 8;
         limit = atoi(arg);
       }
