@@ -258,12 +258,49 @@ void tokenize(char* line, char* args[], int* argc_out) {
   *argc_out = i;
 }
 
+void save_history_to_file(const char* filepath) {
+  if (filepath == NULL) return;
+  
+  FILE* fp = fopen(filepath, "w");
+  if (!fp) return;
+  
+  HIST_ENTRY** hist_list = history_list();
+  if (hist_list) {
+    for (int i = 0; hist_list[i] != NULL; i++) {
+      fprintf(fp, "%s\n", hist_list[i]->line);
+    }
+  }
+  
+  fclose(fp);
+}
+
 int main(int argc, char* argv[]) {
   // Flush after every printf
   setbuf(stdout, NULL);
 
   rl_bind_key('\t', rl_complete);
   rl_attempted_completion_function = completion_hook;
+
+  int last_appended_index = 0;  // Track last appended history entry
+
+  //Loading history from HISTFILE as real OS shell does, same as history -r done later
+  char* histfile = getenv("HISTFILE");
+  if (histfile != NULL) {
+    FILE* fp = fopen(histfile, "r");
+    if (fp) {
+      char buf[1024];
+      while (fgets(buf, sizeof(buf), fp)) {
+        // Remove newline
+        buf[strcspn(buf, "\n")] = 0;
+        
+        // Skip empty lines
+        if (strlen(buf) == 0) continue;
+        
+        add_history(buf);
+      }
+      fclose(fp);
+    }
+  }
 
   while (1) {
     char* line = readline("$ ");
@@ -279,6 +316,7 @@ int main(int argc, char* argv[]) {
 
     // EXIT
     if (strcmp(line, "exit 0") == 0 || strcmp(line, "exit 1") == 0 || strcmp(line, "exit") == 0) {
+      save_history_to_file(histfile);
       exit(0);
     }
 
@@ -504,7 +542,33 @@ int main(int argc, char* argv[]) {
     // HISTORY
     else if (strncmp(line, "history", 7) == 0) {
 
-      // 
+      // add history to a file (append basically )
+      if (strncmp(line, "history -a ", 11) == 0) {
+        char* filepath = line + 11;
+
+        FILE* fp = fopen(filepath, "a");
+        if (!fp) {
+          printf("history: cannot open %s\n", filepath);
+          continue;
+        }
+
+        HIST_ENTRY** hist_list = history_list();
+        if (hist_list) {
+          int total = 0;
+          while (hist_list[total] != NULL) {
+            total++;
+          }
+          for (int i = last_appended_index; i < total; i++) {
+            fprintf(fp, "%s\n", hist_list[i]->line);
+          }
+          
+          
+          last_appended_index = total;
+        }
+
+        fclose(fp);
+        continue;
+      }
 
       // write history to file
       if (strncmp(line, "history -w ", 11) == 0) {
@@ -867,5 +931,9 @@ int main(int argc, char* argv[]) {
     printf("%s: command not found\n", line);
     free(line);
   }
+  
+  // Save history before exiting
+  save_history_to_file(histfile);
+  
   return 0;
 }
