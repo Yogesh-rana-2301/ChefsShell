@@ -393,21 +393,32 @@ int main(int argc, char* argv[]) {
       int argc_echo = 0;
       tokenize(line + 5, args2, &argc_echo);
 
-      int redirect_stdout_index = -1;
-      int redirect_stderr_index = -1;
-      int append_stdout_index = -1;
-      int append_stderr_index = -1;
-      char* append_stderr_file = NULL;
-      char* append_stdout_file = NULL;
-      char* outfile = NULL;
-      char* errfile = NULL;
-
+      // Check if there's a pipe - if so, skip this handler and let pipeline handle it
+      int has_pipe = 0;
       for (int r = 0; r < argc_echo; r++) {
-        if (strcmp(args2[r], ">") == 0 || strcmp(args2[r], "1>") == 0) {
-          redirect_stdout_index = r;
-          outfile = args2[r + 1];
+        if (strcmp(args2[r], "|") == 0) {
+          has_pipe = 1;
           break;
-        } else if (strcmp(args2[r], "2>") == 0) {
+        }
+      }
+      
+      if (!has_pipe) {
+        // Handle echo without pipeline
+        int redirect_stdout_index = -1;
+        int redirect_stderr_index = -1;
+        int append_stdout_index = -1;
+        int append_stderr_index = -1;
+        char* append_stderr_file = NULL;
+        char* append_stdout_file = NULL;
+        char* outfile = NULL;
+        char* errfile = NULL;
+
+        for (int r = 0; r < argc_echo; r++) {
+          if (strcmp(args2[r], ">") == 0 || strcmp(args2[r], "1>") == 0) {
+            redirect_stdout_index = r;
+            outfile = args2[r + 1];
+            break;
+          } else if (strcmp(args2[r], "2>") == 0) {
           redirect_stderr_index = r;
           errfile = args2[r + 1];
           break;
@@ -499,8 +510,9 @@ int main(int argc, char* argv[]) {
         close(saved_stdout);
       }
 
-      continue;
-    }
+        continue;
+      } 
+    } 
 
     /*
     else if (strncmp(line, "echo ", 5) == 0) {
@@ -585,7 +597,7 @@ int main(int argc, char* argv[]) {
           printf("cd: Home is not set\n");
           continue;
         }
-        if (path[1] == "\0") {
+        if (path[1] == '\0') {
           if (chdir(home) != 0) {
             printf("cd: %s: No such file or directory\n", home);
           }
