@@ -14,7 +14,7 @@
 #include <unistd.h>
 
 // builtin commands
-const char* builtins[] = {"cd", "echo", "exit", "history", "pwd", NULL};
+const char* builtins[] = {"cd", "echo", "exit", "github", "help", "history", "linkedin", "fetchme", "pwd", "resume", "youtube", NULL};
 
 char* combined_generator(const char* text, int state) {
   static int stage;        // 0 = builtins, 1 = externals
@@ -302,6 +302,12 @@ int is_builtin(const char* cmd) {
           strcmp(cmd, "pwd") == 0 ||
           strcmp(cmd, "cd") == 0 ||
           strcmp(cmd, "exit") == 0 ||
+          strcmp(cmd, "github") == 0 ||
+          strcmp(cmd, "help") == 0 ||
+          strcmp(cmd, "linkedin") == 0 ||
+          strcmp(cmd, "fetchme") == 0 ||
+          strcmp(cmd, "resume") == 0 ||
+          strcmp(cmd, "youtube") == 0 ||
           strcmp(cmd, "history") == 0);
 }
 
@@ -393,6 +399,17 @@ int main(int argc, char* argv[]) {
       fclose(fp);
     }
   }
+
+  // Welcome message
+  printf("\n\033[1;36m");
+  printf("========================================================\n");
+  printf("       Welcome to ChefsShell - Handcrafted Mini Shell        \n");
+  printf("========================================================\n");
+  printf("\033[0m\n");
+  printf("\033[1;32mA lightweight Unix shell written in C\033[0m\n");
+  printf("\033[2mType '\033[1;33mhelp\033[0;2m' to see available commands\033[0m\n");
+  printf("\033[1;90m---------------------------\033[0m\n");
+  printf("\033[2mType '\033[1;33mfetchme\033[0;2m' to know about me\033[0m\n\n");
 
   while (1) {
     char* line = readline("$ ");
@@ -554,7 +571,8 @@ int main(int argc, char* argv[]) {
       // check for builtins
       if (strcmp(cmd, "echo") == 0 || strcmp(cmd, "exit") == 0 || strcmp(cmd, "type") == 0 ||
           strcmp(cmd, "pwd") == 0 || strncmp(cmd, "cd", 2) == 0 ||
-          strncmp(cmd, "history", 7) == 0) {
+          strcmp(cmd, "github") == 0 || strcmp(cmd, "help") == 0 || strcmp(cmd, "linkedin") == 0 ||
+          strcmp(cmd, "fetchme") == 0 || strcmp(cmd, "resume") == 0 || strcmp(cmd, "youtube") == 0 || strncmp(cmd, "history", 7) == 0) {
         printf("%s is a shell builtin\n", cmd);
         continue;
       }
@@ -598,6 +616,140 @@ int main(int argc, char* argv[]) {
       }
       continue;
 
+    }
+
+    // HELP
+    else if (strcmp(line, "help") == 0) {
+      printf("\n\033[1;36m ChefsShell - All available commands\033[0m\n");
+      printf("\033[2m════════════════════════════════════════════════════════════\033[0m\n\n");
+      
+      printf("\033[1;33mcd\033[0m [directory]\n");
+      printf("  Change the current working directory\n");
+      printf("  Examples: cd /home, cd .., cd ~\n\n");
+
+      printf("\033[1;33mmkdir\033[0m [directory]\n");
+      printf("  Create a new directory\n");
+      printf("  Examples: mkdir new_folder, mkdir -p parent/child\n\n");
+      
+      printf("\033[1;33mecho\033[0m [text...]\n");
+      printf("  Display a line of text\n");
+      printf("  Supports output redirection (>, >>, 2>)\n");
+      printf("  Example: echo Hello World\n\n");
+      
+      printf("\033[1;33mexit\033[0m [code]\n");
+      printf("  Exit the shell\n");
+      printf("  Example: exit 0\n\n");
+      
+      printf("\033[1;33mgithub\033[0m\n");
+      printf("  Opens my GitHub profile link\n\n");
+      
+      printf("\033[1;33mhelp\033[0m\n");
+      printf("  Display this help message\n\n");
+      
+      printf("\033[1;33mhistory\033[0m [n]\n");
+      printf("  Display command history\n");
+      printf("  Options:\n");
+      printf("    history        - Show all history\n");
+      printf("    history n      - Show last n commands\n");
+      printf("    history -a file - Append new history to file\n");
+      printf("    history -w file - Write all history to file\n");
+      printf("    history -r file - Read history from file\n\n");
+      
+      printf("\033[1;33mlinkedin\033[0m\n");
+      printf("  Opens my LinkedIn profile link\n\n");
+      
+      printf("\033[1;33mfetchme\033[0m\n");
+      printf("  Display system and my information\n\n");
+      
+      printf("\033[1;33mpwd\033[0m\n");
+      printf("  Print current working directory\n\n");
+      
+      printf("\033[1;33mresume\033[0m\n");
+      printf("  View resume on Google Drive\n\n");
+      
+      printf("\033[1;33mtype\033[0m <command>\n");
+      printf("  Display command type (builtin or path to executable)\n");
+      printf("  Example: type ls\n\n");
+      
+      printf("\033[1;33myoutube\033[0m\n");
+      printf("  Opens my YouTube channel link\n\n");
+      
+      printf("\033[1;32mExternal Commands:\033[0m\n");
+      printf("  Any executable in $PATH can be run\n");
+      printf("  Examples: ls, cat, grep, etc.\n\n");
+      
+      continue;
+    }
+
+    // GITHUB
+    else if (strcmp(line, "github") == 0) {
+      printf("\n\033[1;36m GitHub Profile\033[0m\n");
+      printf("\033[4;34mhttps://github.com/yogesh-rana-2301\033[0m\n\n");
+      continue;
+    }
+
+    // LINKEDIN 
+    else if (strcmp(line, "linkedin") == 0) {
+      printf("\n\033[1;36m  LinkedIn Profile\033[0m\n");
+      printf("\033[4;34mhttps://linkedin.com/in/yogesh-rana-sde\033[0m\n\n");
+      continue;
+    }
+
+    // RESUME 
+    else if (strcmp(line, "resume") == 0) {
+      printf("\n\033[1;36m Resume\033[0m\n");
+      printf("\033[4;34mhttps://bit.ly/3LZn2Ia\033[0m\n\n");
+      continue;
+    }
+
+    // YOUTUBE 
+    else if (strcmp(line, "youtube") == 0) {
+      printf("\n\033[1;36m YouTube Channel\033[0m\n");
+      printf("\033[4;34mhttps://youtube.com/@SameerRana-2004\033[0m\n\n");
+      continue;
+    }
+
+    // FETCHPROFILE - Personal info display
+    else if (strcmp(line, "fetchme") == 0) {
+      // Get system info
+      char hostname[256];
+      gethostname(hostname, sizeof(hostname));
+      
+      char* user = getenv("USER");
+      if (user == NULL) user = "user";
+      
+      printf("\n");
+      
+      // Displaying Moebius Triangle logo on left, info on right
+      printf("   \033[1;33m           ____\033[0m                      \033[1;32m%s\033[0m@\033[1;32m%s\033[0m\n", user, hostname);
+      printf("   \033[1;33m          /   /\\\033[0m                      \033[1;90m---------------------------\033[0m\n");
+      printf("   \033[1;33m         /___/  \\\033[0m                     \033[1;36mName\033[0m:     Yogesh Rana\n");
+      printf("   \033[1;33m        /   /\\  /\\\033[0m                    \033[1;36mMajor\033[0m:    Computer Science (CS)\n");
+      printf("   \033[1;33m       /   /  \\/  \\\033[0m                   \033[1;36mStack\033[0m:    C++, Python, Web Dev\n");
+      printf("   \033[1;33m      /   /   /\\   \\\033[0m                  \033[1;36mFocus\033[0m:    DSA & System Design\n");
+      printf("   \033[1;36m     /   /   /  \\   \\\033[0m                 \033[1;36mGoal\033[0m:     Money\n");
+      printf("   \033[1;36m    /   /   /\\   \\   \\\033[0m                \033[1;36mLoc\033[0m:      Chandigarh, India\n");
+      printf("   \033[1;36m   /   /   /  \\   \\   \\\033[0m               \033[1;36mStatus\033[0m:   Open to Work\n");
+      printf("   \033[1;34m  /___/___/____\\   \\   \\\033[0m              \033[1;36mShell\033[0m:    ChefsShell v1.0\n");
+      printf("   \033[1;34m /   /          \\   \\  /\\\033[0m             \033[1;36mTerminal\033[0m: xterm-256color\n");
+      printf("   \033[1;34m/___/____________\\___\\/  \\\033[0m            \033[1;36mOS\033[0m:       Windows 11\n");
+      printf("   \033[1;35m\\   \\             \\   \\  /\033[0m            \033[1;36mCPU\033[0m:      Intel Core i7\n");
+      printf("   \033[1;35m \\___\\_____________\\___\\/\033[0m             \033[1;36mGPU\033[0m:      AMD\n");
+
+    printf("\n");
+    
+    // decoration color pallete
+    printf("                                         \033[1;90m█\033[0m\033[1;91m█\033[0m\033[1;92m█\033[0m\033[1;93m█\033[0m\033[1;94m█\033[0m\033[1;95m█\033[0m\033[1;96m█\033[0m\033[1;97m█\033[0m\n");
+    printf("\n");
+    
+    // Resume Box
+    printf("   \033[1;36m╔════════════════════════════════════╗\033[0m\n");
+    printf("   \033[1;36m║\033[0m \033[1;37m Resume:      \033[0m                   \033[1;36m  ║\033[0m\n");
+    printf("   \033[1;36m╠════════════════════════════════════╣\033[0m\n");
+    printf("   \033[1;36m║\033[0m  \033[4;34mhttps://bit.ly/3LZn2Ia\033[0m  \033[1;36m          ║\033[0m\n");
+    printf("   \033[1;36m╚════════════════════════════════════╝\033[0m\n\n");
+      
+      continue;
     }
 
     // absolute path handling for cd

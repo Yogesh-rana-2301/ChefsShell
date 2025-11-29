@@ -14,6 +14,16 @@ const PORT = process.env.PORT || 3000;
 // Serve static files (HTML, JS, CSS)
 app.use(express.static(path.join(__dirname, "public")));
 
+// Serve resume from root directory
+app.get('/yogesh_rana_resume.pdf', (req, res) => {
+  const resumePath = path.join(__dirname, "..", "yogesh_rana_resume.pdf");
+  if (fs.existsSync(resumePath)) {
+    res.sendFile(resumePath);
+  } else {
+    res.status(404).send('Resume not found. Please add yogesh_rana_resume.pdf to the root directory.');
+  }
+});
+
 // Path to the compiled shell binary
 const SHELL_BINARY = path.join(__dirname, "..", "chefs_shell");
 
@@ -65,21 +75,21 @@ wss.on("connection", (ws) => {
   // Receive input from WebSocket client and send to shell
   ws.on("message", (message) => {
     try {
-      shell.write(message.toString());
-    } catch (err) {
-      console.error("Error writing to shell:", err.message);
-    }
-  });
-
-  // Handle terminal resize
-  ws.on("message", (message) => {
-    try {
+      // Try to parse as JSON first (for resize events)
       const data = JSON.parse(message);
       if (data.type === "resize") {
         shell.resize(data.cols, data.rows);
+        return; // Don't write resize events to shell
       }
     } catch (err) {
-      // Not JSON or not a resize message, ignore
+      // Not JSON, treat as regular input
+    }
+    
+    // Write regular input to shell
+    try {
+      shell.write(message.toString());
+    } catch (err) {
+      console.error("Error writing to shell:", err.message);
     }
   });
 
@@ -100,7 +110,7 @@ wss.on("connection", (ws) => {
 server.listen(PORT, () => {
   console.log(`
 ╔════════════════════════════════════════╗
-║     🍳 ChefsShell Web Server 🍳       ║
+║      ChefsShell Web Server          ║
 ╚════════════════════════════════════════╝
 
   Server running at: http://localhost:${PORT}
